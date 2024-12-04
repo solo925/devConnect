@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import (
     User,
     Profile,
@@ -9,19 +9,28 @@ from .models import (
     Comment
 )
 from .utils import get_gravatar
+from rest_framework_simplejwt.tokens import RefreshToken
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id','name','email','avatar','date','password']
+        fields = ['id', 'name', 'email', 'avatar', 'date', 'password']
         extra_kwargs = {'password': {'write_only': True, 'required': True}}
 
     def create(self, validated_data):
+        # Create the user
         user = User.objects.create_user(**validated_data)
         user.avatar = get_gravatar(validated_data.get('email'))
         user.save()
-        Token.objects.create(user=user)
-        return user
+        
+        # Generate JWT token
+        refresh = RefreshToken.for_user(user)
+        return {
+            'user': user,
+            'refresh': str(refresh),
+            'access': str(refresh.access_token)
+        }
+
 
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:

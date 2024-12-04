@@ -30,35 +30,26 @@ from .models import (
     Comment
 )
 
+
 class UserView(APIView):
     def post(self, request):
-        # Serialize user data
         serializer = UserSerializer(data=request.data)
-
         if serializer.is_valid():
-            # Save the user
-            user = serializer.save()
-
-            # Generate JWT token for the user
-            refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
-
-            # Return the JWT token in the response
-            return Response(data={'token': access_token}, status=status.HTTP_201_CREATED)
+            user_data = serializer.save()
+            return Response(data={
+                'user': UserSerializer(user_data['user']).data,
+                'refresh': user_data['refresh'],
+                'access': user_data['access']
+            }, status=status.HTTP_201_CREATED)
         else:
             return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class GetAuthUserView(APIView):
-    # Use JWTAuthentication
     authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Get the user from the request using JWT
         user = request.user
-        if not user.is_authenticated:
-            return Response(data={'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        # Serialize the user data and return the response
         data = UserSerializer(user).data
         return Response(data)
 
@@ -66,20 +57,20 @@ class GetAuthUserView(APIView):
         email = request.data.get('email')
         password = request.data.get('password')
 
-        if email == "" or password == "":
+        if not email or not password:
             return Response({'error': 'Please provide both email and password'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Authenticate the user
+        
         user = authenticate(username=email, password=password)
 
         if not user:
             return Response({'error': 'Invalid Credentials'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Generate JWT token for the user
         refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
+        return Response({
+            'refresh': str(refresh),
+            'access': str(refresh.access_token)
+        }, status=status.HTTP_200_OK)
 
-        return Response({'token': access_token}, status=status.HTTP_200_OK)
 
 class ProfilesView(APIView):
      def get(self, request):
