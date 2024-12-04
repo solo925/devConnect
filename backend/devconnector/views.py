@@ -1,14 +1,12 @@
 from django.shortcuts import render
-
-# Create your views here.
 from django.shortcuts import render
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import authenticate
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import status
 from django.conf import settings
 import requests
@@ -34,40 +32,54 @@ from .models import (
 
 class UserView(APIView):
     def post(self, request):
+        # Serialize user data
         serializer = UserSerializer(data=request.data)
 
         if serializer.is_valid():
-            serializer.save()
-            token = Token.objects.get(user_id=serializer.data.get('id'))
-            return Response(data={'token': token.key}, status=status.HTTP_201_CREATED)
+            # Save the user
+            user = serializer.save()
+
+            # Generate JWT token for the user
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+
+            # Return the JWT token in the response
+            return Response(data={'token': access_token}, status=status.HTTP_201_CREATED)
         else:
             return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class GetAuthUserView(APIView):
-    authentication_classes = (TokenAuthentication,)
+    # Use JWTAuthentication
+    authentication_classes = [JWTAuthentication]
 
     def get(self, request):
-        token = request.headers.get('Authorization')
-        if not token:
-            return Response(data={'error':'No Token. Authorization Denied'}, status=status.HTTP_401_UNAUTHORIZED)
-        user = User.objects.get(id=request.user.id)
+        # Get the user from the request using JWT
+        user = request.user
+        if not user.is_authenticated:
+            return Response(data={'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Serialize the user data and return the response
         data = UserSerializer(user).data
         return Response(data)
-        
+
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
 
         if email == "" or password == "":
-            return Response({'error': 'Please provide both email and password'},status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response({'error': 'Please provide both email and password'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Authenticate the user
         user = authenticate(username=email, password=password)
 
         if not user:
-            return Response({'error': 'Invalid Credentials'},status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Invalid Credentials'}, status=status.HTTP_404_NOT_FOUND)
 
-        token, _ = Token.objects.get_or_create(user=user)
-        return Response({'token': token.key}, status=status.HTTP_200_OK)
+        # Generate JWT token for the user
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+
+        return Response({'token': access_token}, status=status.HTTP_200_OK)
 
 class ProfilesView(APIView):
      def get(self, request):
@@ -76,7 +88,7 @@ class ProfilesView(APIView):
         return Response(data=profile_data, status=status.HTTP_200_OK)
 
 class ProfileView(APIView):
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
@@ -123,7 +135,7 @@ class SingleProfileView(APIView):
        
         
 class ExperienceView(APIView):
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
@@ -146,7 +158,7 @@ class ExperienceView(APIView):
             return Response(data={'error': "No Experience found"}, status=status.HTTP_404_NOT_FOUND)
 
 class EducationView(APIView):
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def post(self, request):
@@ -183,7 +195,7 @@ class GitProfileView(APIView):
 
 
 class PostView(APIView):
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
@@ -221,7 +233,7 @@ class PostView(APIView):
 
 
 class LikeUnlikeView(APIView):
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def post(self, request, *args, **kwargs):
@@ -242,7 +254,7 @@ class LikeUnlikeView(APIView):
 
 
 class CommentView(APIView):
-    authentication_classes = (TokenAuthentication,)
+    authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
 
     def post(self, request, *args, **kwargs):
