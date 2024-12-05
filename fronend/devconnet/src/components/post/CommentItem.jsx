@@ -1,12 +1,12 @@
+import dayjs from "dayjs";
 import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
-import Moment from "react-moment";
 import { deleteComment } from "../../actions/post";
 
 const CommentItem = ({ comment, postId }) => {
   const dispatch = useDispatch();
-  const auth = useSelector(state => state.auth);
+  const auth = useSelector((state) => state.auth);
 
   return (
     <div className="post bg-white p-1 my-1">
@@ -19,11 +19,11 @@ const CommentItem = ({ comment, postId }) => {
       <div>
         <p className="my-1">{comment.text}</p>
         <p className="post-date">
-          Posted on <Moment format="DD/MM/YYYY">{comment.date}</Moment>
+          Posted on {dayjs(comment.date).format("DD/MM/YYYY")}
         </p>
         {!auth.loading && comment.user === auth.user.id && (
           <button
-            onClick={e => dispatch(deleteComment(postId, comment.id))}
+            onClick={(e) => dispatch(deleteComment(postId, comment.id))}
             className="btn btn-danger"
           >
             <i className="fas fa-times"></i>

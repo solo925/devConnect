@@ -1,5 +1,5 @@
 import React from "react";
-import { Route, Routes } from "react-router-dom"; // Replace Switch with Routes
+import { Route, Routes } from "react-router-dom";
 
 import Login from "../auth/Login";
 import Register from "../auth/Register";

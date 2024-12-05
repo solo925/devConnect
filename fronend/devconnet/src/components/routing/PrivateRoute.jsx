@@ -1,15 +1,16 @@
 import React from "react";
-import { Route, Routes } from "react-router-dom"; // Import Routes and Route
-import Dashboard from "../dashboard/Dashboard";
-import PrivateRoute from "./PrivateRoute";
+import { useSelector } from "react-redux";
+import { Navigate } from "react-router-dom";
 
-const RoutesComponent = () => {
-  return (
-    <Routes>
-      <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
-      {/* Other routes */}
-    </Routes>
-  );
+const PrivateRoute = ({ children }) => {
+  const auth = useSelector((state) => state.auth);
+  const { isAuthenticated, loading } = auth;
+
+  if (!isAuthenticated && !loading) {
+    return <Navigate to="/login" />;
+  }
+
+  return children;
 };
 
-export default RoutesComponent;
+export default PrivateRoute;

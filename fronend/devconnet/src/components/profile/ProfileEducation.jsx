@@ -1,5 +1,5 @@
+import dayjs from "dayjs";
 import React from "react";
-import Moment from "react-moment";
 
 const ProfileEducation = ({
   education: {
@@ -9,22 +9,22 @@ const ProfileEducation = ({
     current,
     to_date,
     from_date,
-    description
-  }
+    description,
+  },
 }) => {
   return (
     <div>
       <h3 className="text-dark">{school}</h3>
       <p>
-        <Moment format="YYYY/MM/DD">{from_date}</Moment> -{" "}
-        {!to_date ? " Now" : <Moment format="YYYY/MM/DD">{to_date}</Moment>}
+        {from_date ? dayjs(from_date).format("YYYY/MM/DD") : "N/A"} -{" "}
+        {to_date ? dayjs(to_date).format("YYYY/MM/DD") : "Now"}
       </p>
       <p>
         <strong>Degree: </strong>
         {degree}
       </p>
       <p>
-        <strong>Field Of Studey: </strong>
+        <strong>Field Of Study: </strong>
         {field_of_study}
       </p>
       <p>

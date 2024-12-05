@@ -1,5 +1,5 @@
+import dayjs from "dayjs";
 import React, { Fragment } from "react";
-import Moment from "react-moment";
 import { useDispatch } from "react-redux";
 import { deleteEducation } from "../../actions/profile";
 
@@ -8,16 +8,22 @@ const Education = ({ education }) => {
 
   const educations =
     education &&
-    education.map(edu => (
+    education.map((edu) => (
       <tr key={edu.id}>
         <td>{edu.school}</td>
         <td className="hide-sm">{edu.degree}</td>
         <td className="hide-sm">
-          <Moment format="YYYY/MM/DD">{edu.from_date}</Moment> -{" "}
-          {edu.to_date == null ? (
-            " Now"
+          {/* Ensure valid date values */}
+          {edu.from_date ? (
+            dayjs(edu.from_date).format("YYYY/MM/DD")
           ) : (
-            <Moment format="YYYY/MM/DD">{edu.to_date}</Moment>
+            "N/A"
+          )}{" "}
+          -{" "}
+          {edu.to_date ? (
+            dayjs(edu.to_date).format("YYYY/MM/DD")
+          ) : (
+            "Now"
           )}
         </td>
         <td>
@@ -30,6 +36,7 @@ const Education = ({ education }) => {
         </td>
       </tr>
     ));
+
   return (
     <Fragment>
       <h2 className="my-2">Education Credentials</h2>

@@ -1,9 +1,9 @@
 import React, { Fragment, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createProfile } from "../../actions/profile";
 
-const CreateProfile = ({ history }) => {
+const CreateProfile = () => {
   const [formData, setFormData] = useState({
     company: "",
     website: "",
@@ -16,8 +16,9 @@ const CreateProfile = ({ history }) => {
     facebook: "",
     linkedin: "",
     youtube: "",
-    instagram: ""
+    instagram: "",
   });
+
   const [displaySocialInputs, toggleSocialInputs] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -34,16 +35,16 @@ const CreateProfile = ({ history }) => {
     facebook,
     linkedin,
     youtube,
-    instagram
+    instagram,
   } = formData;
 
-  const onChange = e => {
+  const onChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const onSubmit = e => {
+  const onSubmit = (e) => {
     e.preventDefault();
-    dispatch(createProfile(formData, navigate));
+    dispatch(createProfile(formData, navigate)); // Use navigate here to redirect
   };
 
   return (
@@ -212,12 +213,12 @@ const CreateProfile = ({ history }) => {
           </Fragment>
         )}
         <input type="submit" className="btn btn-primary my-1" />
-        <a className="btn btn-light my-1" href="dashboard.html">
+        <Link className="btn btn-light my-1" to="/dashboard">
           Go Back
-        </a>
+        </Link>
       </form>
     </Fragment>
   );
 };
 
-export default withRouter(CreateProfile);
+export default CreateProfile;

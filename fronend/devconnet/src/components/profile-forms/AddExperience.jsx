@@ -3,7 +3,7 @@ import { useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import { addExperience } from "../../actions/profile";
 
-const AddExperience = ({ history }) => {
+const AddExperience = () => {
   const [formData, setFormData] = useState({
     company: "",
     title: "",
@@ -11,30 +11,23 @@ const AddExperience = ({ history }) => {
     from_date: "",
     to_date: "",
     current: false,
-    description: ""
+    description: "",
   });
   const [toDateDisabled, toggleDisabled] = useState(false);
 
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // Replaces withRouter for navigation
   const dispatch = useDispatch();
 
-  const {
-    company,
-    title,
-    location,
-    from_date,
-    to_date,
-    current,
-    description
-  } = formData;
+  const { company, title, location, from_date, to_date, current, description } =
+    formData;
 
-  const onChange = e => {
+  const onChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const onSubmit = e => {
+  const onSubmit = (e) => {
     e.preventDefault();
-    dispatch(addExperience(formData, navigate));
+    dispatch(addExperience(formData, navigate)); // Pass navigate to handle redirection
   };
 
   return (
@@ -90,7 +83,7 @@ const AddExperience = ({ history }) => {
               type="checkbox"
               name="current"
               checked={current}
-              onChange={e => {
+              onChange={() => {
                 setFormData({ ...formData, current: !current });
                 toggleDisabled(!toDateDisabled);
               }}
@@ -105,7 +98,7 @@ const AddExperience = ({ history }) => {
             name="to_date"
             value={to_date}
             onChange={onChange}
-            disabled={toDateDisabled ? "disabled" : ""}
+            disabled={toDateDisabled}
           />
         </div>
         <div className="form-group">
@@ -127,4 +120,4 @@ const AddExperience = ({ history }) => {
   );
 };
 
-export default withRouter(AddExperience);
+export default AddExperience;

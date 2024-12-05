@@ -25,7 +25,7 @@ const Login = () => {
 
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" />; // Use Navigate here
+    return <Navigate to="/dashboard" />;
   }
 
   return (

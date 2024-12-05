@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import { createProfile, getCurrentProfile } from "../../actions/profile";
 
-const EditProfile = ({ history }) => {
+const EditProfile = () => {
   const profile = useSelector(state => state.profile.profile);
 
   const [formData, setFormData] = useState({
@@ -20,12 +20,20 @@ const EditProfile = ({ history }) => {
     youtube: "",
     instagram: ""
   });
+
   const [displaySocialInputs, toggleSocialInputs] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
   useEffect(() => {
-    getCurrentProfile();
-    setFormData({ ...profile });
+    // Fetch the current profile data
+    dispatch(getCurrentProfile());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (profile) {
+      setFormData({ ...profile });
+    }
   }, [profile]);
 
   const {
@@ -43,13 +51,13 @@ const EditProfile = ({ history }) => {
     instagram
   } = formData;
 
-  const onChange = e => {
+  const onChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const onSubmit = e => {
+  const onSubmit = (e) => {
     e.preventDefault();
-    dispatch(createProfile(formData, navigate, true));
+    dispatch(createProfile(formData, navigate, true)); // Use navigate to redirect after form submission
   };
 
   return (
@@ -77,6 +85,7 @@ const EditProfile = ({ history }) => {
             Give us an idea of where you are at in your career
           </small>
         </div>
+
         <div className="form-group">
           <input
             type="text"
@@ -89,6 +98,7 @@ const EditProfile = ({ history }) => {
             Could be your own company or one you work for
           </small>
         </div>
+
         <div className="form-group">
           <input
             type="text"
@@ -101,6 +111,7 @@ const EditProfile = ({ history }) => {
             Could be your own or a company website
           </small>
         </div>
+
         <div className="form-group">
           <input
             type="text"
@@ -113,6 +124,7 @@ const EditProfile = ({ history }) => {
             City & state suggested (eg. Boston, MA)
           </small>
         </div>
+
         <div className="form-group">
           <input
             type="text"
@@ -125,6 +137,7 @@ const EditProfile = ({ history }) => {
             Please use comma separated values (eg. HTML,CSS,JavaScript,PHP)
           </small>
         </div>
+
         <div className="form-group">
           <input
             type="text"
@@ -138,6 +151,7 @@ const EditProfile = ({ history }) => {
             username
           </small>
         </div>
+
         <div className="form-group">
           <textarea
             placeholder="* A short bio of yourself"
@@ -217,6 +231,7 @@ const EditProfile = ({ history }) => {
             </div>
           </Fragment>
         )}
+
         <input type="submit" className="btn btn-primary my-1" />
         <Link className="btn btn-light my-1" to="/dashboard">
           Go Back
@@ -226,4 +241,4 @@ const EditProfile = ({ history }) => {
   );
 };
 
-export default withRouter(EditProfile);
+export default EditProfile;

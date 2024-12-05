@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, Navigate } from "react-router-dom"; // Use Navigate instead of Redirect
+import { Link, Navigate } from "react-router-dom";
 import { setAlert } from "../../actions/alert";
 import { register } from "../../actions/auth";
 
@@ -30,9 +30,8 @@ const Register = () => {
     }
   };
 
-  // Redirect if logged in
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" />; // Use Navigate here
+    return <Navigate to="/dashboard" />;
   }
 
   return (
