@@ -22,17 +22,7 @@ class UserSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data)
         user.avatar = get_gravatar(validated_data.get('email'))
         user.save()
-        
-        # Generate JWT tokens
-        refresh = RefreshToken.for_user(user)
-        return {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'avatar': user.avatar,
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        }
+        return user  # Return the user instance
 
 
 

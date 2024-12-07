@@ -6,6 +6,8 @@ from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.http import JsonResponse
 
 from .serializers import (
     UserSerializer,
@@ -22,47 +24,78 @@ from .models import User, Profile, Experience, Education, Post, Comment
 
 
 def generate_tokens(user):
+    """
+    Generate JWT access and refresh tokens for a user.
+    """
+    if not isinstance(user, User):  # Ensure user is a valid User model instance
+        raise ValueError("Expected a User instance for token generation")
+
+    # Create tokens
     refresh = RefreshToken.for_user(user)
+    access_token = str(refresh.access_token)
+    refresh_token = str(refresh)
+
+    # Log token creation (for debugging)
+    print(f"Generated tokens for user {user.email}: Access - {access_token}, Refresh - {refresh_token}")
+
     return {
-        "refresh": str(refresh),
-        "access": str(refresh.access_token)
+        "access": access_token,
+        "refresh": refresh_token
     }
 
-
-class RegisterUserView(APIView):
-    def post(self, request):
-        serializer = UserSerializer(data=request.data)
-        if serializer.is_valid():
-            user_data = serializer.save()
-            tokens = generate_tokens(user_data)
-            return Response({**tokens, "user": UserSerializer(user_data).data}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LoginUserView(APIView):
     permission_classes = [AllowAny]
+
     def post(self, request):
         email = request.data.get("email")
         password = request.data.get("password")
 
         if not email or not password:
-            return Response({"error": "Please provide both email and password"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Please provide both email and password"}, status=400)
 
         user = authenticate(username=email, password=password)
         if not user:
-            return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "Invalid credentials"}, status=401)
 
-        tokens = generate_tokens(user)
-        return Response({**tokens, "user": UserSerializer(user).data}, status=status.HTTP_200_OK)
+        try:
+            tokens = generate_tokens(user)
 
+            # Return user data along with the tokens
+            return Response({
+                "user": UserSerializer(user).data,
+                "access": tokens["access"],  # Ensure access token is sent
+                "refresh": tokens["refresh"],  # Ensure refresh token is sent
+            })
+        except Exception as e:
+            return Response({"error": f"Token generation failed: {str(e)}"}, status=500)
 
-# Get Authenticated User
-class AuthenticatedUserView(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+class RegisterUserView(APIView):
+    permission_classes = [AllowAny]
 
-    def get(self, request):
-        return Response(UserSerializer(request.user).data)
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                # Save the user and get the instance
+                user = serializer.save()
+                
+                # Generate tokens for the user
+                tokens = generate_tokens(user)
+                
+                # Return user details and tokens
+                return Response({
+                    'user': UserSerializer(user).data,
+                    'refresh': tokens['refresh'],
+                    'access': tokens['access']
+                }, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                # Log the error for debugging
+                print(f"Error during token generation: {e}")
+                return Response({"error": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 # Profiles
@@ -77,22 +110,33 @@ class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        profile = get_object_or_404(Profile, user=request.user)
-        return Response(GetProfileSerializer(profile).data)
+        try:
+            profile = get_object_or_404(Profile, user=request.user)
+            return Response(GetProfileSerializer(profile).data)
+        except Exception as e:
+            return Response({"error": "Profile not found", "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def post(self, request):
-        serializer = ProfileSerializer(instance=request.user.profile, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save(user=request.user)
-            return Response(GetProfileSerializer(request.user.profile).data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            # Check if the user already has a profile
+            profile, created = Profile.objects.get_or_create(user=request.user)
+            serializer = ProfileSerializer(instance=profile, data=request.data, partial=True)
+            
+            if serializer.is_valid():
+                serializer.save()
+                return Response(GetProfileSerializer(profile).data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request):
-        request.user.delete()
-        return Response({"message": "User and profile deleted"}, status=status.HTTP_204_NO_CONTENT)
+        try:
+            # Delete the profile and the user
+            request.user.delete()
+            return Response({"message": "User and profile deleted"}, status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-
-# Posts
 class PostView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]

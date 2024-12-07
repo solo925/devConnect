@@ -1,30 +1,12 @@
 import axios from "axios";
-import setAuthToken from "../utils/setAuthToken";
+import Cookies from "js-cookie";
 import { setAlert } from "./alert";
 import {
-  AUTH_ERROR,
-  CLEAR_PROFILE,
   LOGIN_FAIL,
   LOGIN_SUCCESS,
-  LOGOUT,
   REGISTER_FAIL,
-  REGISTER_SUCCESS,
-  USER_LOADED
+  REGISTER_SUCCESS
 } from "./types";
-
-// Load User
-export const loadUser = () => async (dispatch) => {
-  if (localStorage.token) {
-    setAuthToken(localStorage.token);
-  }
-
-  try {
-    const res = await axios.get("http://127.0.0.1:8000/api/auth/user");
-    dispatch({ type: USER_LOADED, payload: res.data });
-  } catch (err) {
-    dispatch({ type: AUTH_ERROR });
-  }
-};
 
 // Register User
 export const register = ({ name, email, password }) => async (dispatch) => {
@@ -36,11 +18,15 @@ export const register = ({ name, email, password }) => async (dispatch) => {
 
   try {
     const res = await axios.post("http://127.0.0.1:8000/api/auth/register", body, config);
+    console.log("register data", res.data);
 
     dispatch({
       type: REGISTER_SUCCESS,
       payload: res.data.access, // Use the access token
     });
+
+    // Set token in cookies
+    Cookies.set("access_token", res.data.access, { expires: 1 }); // Expire in 1 day
 
     dispatch(loadUser());
   } catch (err) {
@@ -54,11 +40,10 @@ export const register = ({ name, email, password }) => async (dispatch) => {
   }
 };
 
-
 // Login User
-export const login = (email, password) => async dispatch => {
+export const login = (email, password) => async (dispatch) => {
   const config = {
-    headers: { "Content-Type": "application/json" }
+    headers: { "Content-Type": "application/json" },
   };
 
   const body = JSON.stringify({ email, password });
@@ -68,8 +53,11 @@ export const login = (email, password) => async dispatch => {
 
     dispatch({
       type: LOGIN_SUCCESS,
-      payload: res.data.token
+      payload: res.data.access,
     });
+
+    // Set token in cookies
+    Cookies.set("access_token", res.data.access, { expires: 1 }); // Expire in 1 day
 
     dispatch(loadUser());
   } catch (err) {
@@ -78,13 +66,15 @@ export const login = (email, password) => async dispatch => {
     dispatch(setAlert(error, "danger"));
 
     dispatch({
-      type: LOGIN_FAIL
+      type: LOGIN_FAIL,
     });
   }
 };
 
-// Logout
-export const logout = () => dispatch => {
+export const logout = () => (dispatch) => {
+
+  Cookies.remove("access_token");
+
   dispatch({ type: LOGOUT });
   dispatch({ type: CLEAR_PROFILE });
 };

@@ -1,22 +1,23 @@
+import Cookies from "js-cookie";
 import {
-  REGISTER_SUCCESS,
-  REGISTER_FAIL,
-  USER_LOADED,
+  ACCOUNT_DELETED,
   AUTH_ERROR,
-  LOGIN_SUCCESS,
   LOGIN_FAIL,
+  LOGIN_SUCCESS,
   LOGOUT,
-  ACCOUNT_DELETED
+  REGISTER_FAIL,
+  REGISTER_SUCCESS,
+  USER_LOADED
 } from "../actions/types";
 
 const initialState = {
-  token: localStorage.getItem("token"),
+  token: Cookies.get("access_token"),
   isAuthenticated: null,
   loading: true,
   user: null
 };
 
-export default function(state = initialState, action) {
+export default function (state = initialState, action) {
   const { type, payload } = action;
 
   switch (type) {
@@ -25,19 +26,24 @@ export default function(state = initialState, action) {
 
     case REGISTER_SUCCESS:
     case LOGIN_SUCCESS:
-      localStorage.setItem("token", payload);
+      console.log('Token received:', payload);
+      // Store token in cookies with an expiration time of 1 day
+      Cookies.set("access_token", payload.access, { expires: 1 });
       return {
         ...state,
-        token: payload,
+        token: payload.access,
         isAuthenticated: true,
         loading: false
       };
+
     case AUTH_ERROR:
     case REGISTER_FAIL:
     case LOGIN_FAIL:
     case LOGOUT:
     case ACCOUNT_DELETED:
-      localStorage.removeItem("token");
+      console.log('Clearing token');
+      // Remove token from cookies when logging out or account is deleted
+      Cookies.remove("access_token");
       return {
         ...state,
         token: null,
