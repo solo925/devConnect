@@ -1,15 +1,11 @@
-from django.shortcuts import render
-from django.shortcuts import render
-from django.core.exceptions import ObjectDoesNotExist
+from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import status
-from django.conf import settings
-import requests
 
 from .serializers import (
     UserSerializer,
@@ -21,258 +17,156 @@ from .serializers import (
     GetPostSerializer,
     CommentSerializer
 )
-from .models import (
-    User,
-    Profile,
-    Experience,
-    Education,
-    Post,
-    Comment
-)
+from .models import User, Profile, Experience, Education, Post, Comment
 
 
-class UserView(APIView):
+
+def generate_tokens(user):
+    refresh = RefreshToken.for_user(user)
+    return {
+        "refresh": str(refresh),
+        "access": str(refresh.access_token)
+    }
+
+
+class RegisterUserView(APIView):
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
             user_data = serializer.save()
-            return Response(data={
-                'user': UserSerializer(user_data['user']).data,
-                'refresh': user_data['refresh'],
-                'access': user_data['access']
-            }, status=status.HTTP_201_CREATED)
-        else:
-            return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            tokens = generate_tokens(user_data)
+            return Response({**tokens, "user": UserSerializer(user_data).data}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class GetAuthUserView(APIView):
+
+class LoginUserView(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        email = request.data.get("email")
+        password = request.data.get("password")
+
+        if not email or not password:
+            return Response({"error": "Please provide both email and password"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = authenticate(username=email, password=password)
+        if not user:
+            return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        tokens = generate_tokens(user)
+        return Response({**tokens, "user": UserSerializer(user).data}, status=status.HTTP_200_OK)
+
+
+# Get Authenticated User
+class AuthenticatedUserView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        data = UserSerializer(user).data
-        return Response(data)
-
-    def post(self, request):
-        email = request.data.get('email')
-        password = request.data.get('password')
-
-        if not email or not password:
-            return Response({'error': 'Please provide both email and password'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        user = authenticate(username=email, password=password)
-
-        if not user:
-            return Response({'error': 'Invalid Credentials'}, status=status.HTTP_404_NOT_FOUND)
-
-        refresh = RefreshToken.for_user(user)
-        return Response({
-            'refresh': str(refresh),
-            'access': str(refresh.access_token)
-        }, status=status.HTTP_200_OK)
+        return Response(UserSerializer(request.user).data)
 
 
+# Profiles
 class ProfilesView(APIView):
-     def get(self, request):
+    def get(self, request):
         profiles = Profile.objects.all()
-        profile_data = GetProfileSerializer(profiles, many=True).data
-        return Response(data=profile_data, status=status.HTTP_200_OK)
+        return Response(GetProfileSerializer(profiles, many=True).data)
+
 
 class ProfileView(APIView):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
-    def get(self, request, *args, **kwargs):
-        try:
-           profile = request.user.profile
-        except ObjectDoesNotExist:
-            return Response(data={'error': "No profile found"}, status=status.HTTP_404_NOT_FOUND)
-        
-        profile_data = GetProfileSerializer(request.user.profile).data
-        return Response(data=profile_data, status=status.HTTP_200_OK)
+    def get(self, request):
+        profile = get_object_or_404(Profile, user=request.user)
+        return Response(GetProfileSerializer(profile).data)
 
     def post(self, request):
-        has_profile = Profile.objects.filter(user=request.user).exists()
-        if has_profile:
-            instance = request.user.profile
-            serializer = ProfileSerializer(instance, data=request.data)
-        else:
-            serializer = ProfileSerializer(data=request.data)
-        
+        serializer = ProfileSerializer(instance=request.user.profile, data=request.data, partial=True)
         if serializer.is_valid():
-            
             serializer.save(user=request.user)
-            
-            profile_data = GetProfileSerializer(request.user.profile).data
-            return Response(data=profile_data, status=status.HTTP_200_OK)
-        else:
-            return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response(GetProfileSerializer(request.user.profile).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request):
         request.user.delete()
-        return Response(data={'msg': "Profile and user deleted"}, status= status.HTTP_204_NO_CONTENT)
+        return Response({"message": "User and profile deleted"}, status=status.HTTP_204_NO_CONTENT)
 
 
-class SingleProfileView(APIView):
-    def get(self, request, *args, **kwargs):
-        try:
-            user = User.objects.get(id=kwargs.get('id'))
-            profile_data = GetProfileSerializer(user.profile).data
-            return Response(data=profile_data, status=status.HTTP_200_OK)
-            
-        except ObjectDoesNotExist:
-            return Response(data={'error': "No profile found"}, status=status.HTTP_404_NOT_FOUND)
-       
-        
+# Posts
+class PostView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, post_id=None):
+        if post_id:
+            post = get_object_or_404(Post, id=post_id)
+            return Response(GetPostSerializer(post).data)
+        posts = Post.objects.all()
+        return Response(PostSerializer(posts, many=True).data)
+
+    def post(self, request):
+        serializer = PostSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, post_id):
+        post = get_object_or_404(Post, id=post_id, user=request.user)
+        post.delete()
+        return Response({"message": "Post deleted"}, status=status.HTTP_204_NO_CONTENT)
+
+
+# Comments
+class CommentView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, post_id):
+        post = get_object_or_404(Post, id=post_id)
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user, post=post)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, comment_id):
+        comment = get_object_or_404(Comment, id=comment_id, user=request.user)
+        comment.delete()
+        return Response({"message": "Comment deleted"}, status=status.HTTP_204_NO_CONTENT)
+
+
+# Add Experience
 class ExperienceView(APIView):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = ExperienceSerializer(data=request.data)
-
         if serializer.is_valid():
             serializer.save(profile=request.user.profile)
-            profile_data = GetProfileSerializer(request.user.profile).data
-            return Response(data=profile_data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(GetProfileSerializer(request.user.profile).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, e_id):
-        experience = Experience.objects.filter(profile = request.user.profile, id=e_id).first()
-        if experience:
-            experience.delete()
-            profile_data = GetProfileSerializer(request.user.profile).data
-            return Response(data=profile_data, status=status.HTTP_200_OK)
-        else:
-            return Response(data={'error': "No Experience found"}, status=status.HTTP_404_NOT_FOUND)
+    def delete(self, request, exp_id):
+        experience = get_object_or_404(Experience, id=exp_id, profile=request.user.profile)
+        experience.delete()
+        return Response(GetProfileSerializer(request.user.profile).data)
 
+
+# Add Education
 class EducationView(APIView):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = EducationSerializer(data=request.data)
-
         if serializer.is_valid():
             serializer.save(profile=request.user.profile)
-            profile_data = GetProfileSerializer(request.user.profile).data
-            return Response(data=profile_data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(GetProfileSerializer(request.user.profile).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, e_id):
-        education = Education.objects.filter(profile = request.user.profile, id=e_id).first()
-        if education:
-            education.delete()
-            profile_data = GetProfileSerializer(request.user.profile).data
-            return Response(data=profile_data, status=status.HTTP_200_OK)
-        else:
-            return Response(data={'error': "No education found"}, status=status.HTTP_404_NOT_FOUND)
-
-class GitProfileView(APIView):
-    def get(self, request, *args, **kwargs):
-        username = kwargs.get('username')
-        client_id = settings.GIT_CLIENT_ID
-        client_secret = settings.GIT_CLIENT_SECRET
-        uri = f'https://api.github.com/users/{username}/repos?per_page=5&sort=created:asc&\
-            client_id={client_id}&client_secret={client_secret}'
-        
-        response = requests.get(uri)
-        if response.status_code != 200:
-            return Response(data={'error': "No Github account found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(data=response.json(), status=status.HTTP_200_OK)
-
-
-class PostView(APIView):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
-
-    def get(self, request, *args, **kwargs):
-        post_id = kwargs.get('id')
-        if post_id:
-            try:
-                post = Post.objects.get(id=post_id)
-                return Response(GetPostSerializer(post).data, status=status.HTTP_200_OK)
-            except ObjectDoesNotExist:
-                return Response({'error': "No post found"}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            posts = Post.objects.all()
-            posts_data = PostSerializer(posts, many=True).data
-            return Response(data=posts_data, status=status.HTTP_200_OK)
-
-    def post(self, request, *args, **kwargs):
-        serializer = PostSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(user=request.user, name=request.user.name, avatar=request.user.avatar)
-            return Response(data=serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, *args, **kwargs):
-        post_id = kwargs.get('id')
-        try:
-            post = Post.objects.get(id=post_id)
-            if post.user.id == request.user.id:
-                post.delete()
-                return Response({'msg': 'Post deleted'}, status=status.HTTP_200_OK)
-            else:
-                return Response({'Error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
-        except ObjectDoesNotExist:
-            return Response({'error': "No post found"}, status=status.HTTP_404_NOT_FOUND)
-
-
-class LikeUnlikeView(APIView):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
-
-    def post(self, request, *args, **kwargs):
-        post_id = kwargs.get('id')
-        try:
-            post = Post.objects.get(id=post_id)
-            liked = post.likes.filter(id=request.user.id).exists()
-
-            if liked:
-                post.likes.remove(request.user.id)
-                return Response(GetPostSerializer(post).data , status=status.HTTP_200_OK)
-            else:
-                post.likes.add(request.user.id)
-                post.save()
-                return Response(GetPostSerializer(post).data , status=status.HTTP_200_OK)
-        except:
-            return Response({'error': "No post found"}, status=status.HTTP_404_NOT_FOUND)
-
-
-class CommentView(APIView):
-    authentication_classes = (JWTAuthentication,)
-    permission_classes = (IsAuthenticated,)
-
-    def post(self, request, *args, **kwargs):
-        post_id = kwargs.get('id')
-        comment_id = kwargs.get('c_id')
-
-        serializer = CommentSerializer(data=request.data)
-
-        if serializer.is_valid():
-            post = Post.objects.filter(id=post_id).first()
-            if post:
-                serializer.save(user=request.user, post=post)
-                return Response(serializer.data , status=status.HTTP_200_OK)
-            else:
-                return Response({'error': "No post found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
-    def delete(self, request, *args, **kwargs):
-        comment_id = kwargs.get('id')
-        try:
-            comment = Comment.objects.get(id=comment_id)
-            if comment.user.id == request.user.id:
-                comment.delete()
-                return Response({'msg': "Comment Deleted"} , status=status.HTTP_200_OK)
-            else:
-                return Response({'error': "Unauthorized"} , status=status.HTTP_401_UNAUTHORIZED)
-
-        except ObjectDoesNotExist:
-            return Response({'error': "No comment found"}, status=status.HTTP_404_NOT_FOUND)
-
+    def delete(self, request, edu_id):
+        education = get_object_or_404(Education, id=edu_id, profile=request.user.profile)
+        education.delete()
+        return Response(GetProfileSerializer(request.user.profile).data)

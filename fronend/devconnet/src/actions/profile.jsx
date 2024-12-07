@@ -2,14 +2,14 @@ import axios from "axios";
 import { setAlert } from "../actions/alert";
 
 import {
+  ACCOUNT_DELETED,
+  CLEAR_PROFILE,
   GET_PROFILE,
   GET_PROFILES,
   GET_REPOS,
   GITHUB_ERROR,
   PROFILE_ERROR,
-  UPDATE_PROFILE,
-  CLEAR_PROFILE,
-  ACCOUNT_DELETED
+  UPDATE_PROFILE
 } from "./types";
 
 // Get Current User Profile
@@ -78,7 +78,7 @@ export const createProfile = (
 
     const body = JSON.stringify(formData);
 
-    const res = await axios.post("/api/profile", body, config);
+    const res = await axios.post("http://127.0.0.1:8000/api/profile", body, config);
 
     dispatch({ type: GET_PROFILE, payload: res.data });
 

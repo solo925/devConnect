@@ -23,13 +23,17 @@ class UserSerializer(serializers.ModelSerializer):
         user.avatar = get_gravatar(validated_data.get('email'))
         user.save()
         
-        # Generate JWT token
+        # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
         return {
-            'user': user,
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'avatar': user.avatar,
             'refresh': str(refresh),
-            'access': str(refresh.access_token)
+            'access': str(refresh.access_token),
         }
+
 
 
 class ProfileSerializer(serializers.ModelSerializer):
